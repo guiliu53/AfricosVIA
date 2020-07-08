@@ -1,0 +1,46 @@
+---
+title: "Tables_AFRICOS_VIA"
+author: "Gui Liu"
+date: "5/23/2020"
+output: word_document
+---
+
+```{r setup , code=readLines("Data_cleaning_africos.R"), include = F}
+knitr::opts_chunk$set(echo = TRUE)
+source('Data_cleaning_africos.R', echo=T, include=F)
+library(arsenal)
+```
+
+## Table 1. Descriptive statistics of AFRICOS participants at enrollemnt by HIV status. 
+
+```{r tab1, include = T}
+tabcontrols <- tableby.control(test= TRUE, numeric.simplify = T, cat.simplify = F, numeric.test = "anova", numeric.stats = c("meansd", "medianq1q3"), cat.stats = "countpct", digits=1L)
+
+mylabels <- list(age = "Age", country = "Country", 
+                 timeToClinic_min = "Travel time to clinic (mins)",
+                 para = "Number of births",
+                 sxptlife = "Number of sex partners (lifetime)", 
+                 sxpt6mo = "Number of sex partners (past 6 months)", 
+                 condom6mo = "Condom use (past 6 months)" , 
+                 dur_hiv = "Year since HIV diagnosis" ,
+                 takearv = "Currently taking ART",
+                 dur_art = "Years since starting ART",
+                 vl_cat = "Viral load", 
+                 cd4nadir = "Nadir CD4+ cell count", 
+                 cd4artin = "CD4+ cell count at ART initiation")
+tab1 <- tableby(hivflag ~ age + country + timeToClinic_min + para + sxptlife + sxpt6mo +
+                     condom6mo, data=via_enroll, control = tabcontrols )
+tab2 <- tableby(hivflag ~ dur_hiv+ takearv + vl_cat + cd4nadir + cd4artin, 
+                control = tabcontrols, data=via_enroll)
+table <- merge(tab1, tab2)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
