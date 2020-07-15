@@ -7,6 +7,7 @@ library(dplyr)
 library(openxlsx)
 library(arsenal)
 library(nnet)
+library(broom)
 
 load("ccs_11feb2020.Rdata") 
 via <- ccs_11feb2020
@@ -62,8 +63,8 @@ via_enroll <- via %>% filter(visit == 1) %>%
                                 c_exam == "Abnormal" & c_exama == "No acetowhite lesion" ~ 3, #abnormal, no lesion
                                 c_exam == "Not done" | is.na(c_exam) ~ 4)), #not done
             exam_result = as.factor(ifelse(lesions != 4, lesions, NA)),
-            exam_result2 = as.factor(ifelse(exam_result == 2, 1, 0)),
-            exam_result3 = as.factor(ifelse(exam_result %in% c(2,3), 1, 0)),
+            exam_result2 = as.factor(ifelse(exam_result == 2, 1, 0)), #lesion vs no lesion 
+            exam_result3 = as.factor(ifelse(exam_result %in% c(2,3), 1, 0)), #any abnormaility vs normal
             exam_done = as.numeric(ifelse(lesions != 4, 1, 0)),
             suppress_200 = ifelse(vl < 200, 1, 0),
             suppress_1000 = ifelse(vl < 1000, 1, 0), 
@@ -139,10 +140,12 @@ write2(tab2, "table1_pos",
 ### cervical exam outcomes among all participants ###  
 model_exam <- glm(exam_done ~ country, data = via_enroll)
 coefs <- coef(model_exam)
-or <- exp(coefs)
-
-chi <- table(via_enroll$exam_result, via_enroll$country)
+or <- exp(coefs) 
+chi <- table(via_enroll$exam_done, via_enroll$country)
 chisq.test(chi)
+  #relative to Kenyan participants, women from other countries were significantly less 
+  #likely to undergo cervical exam 
+
 
 via_enroll$exam_result2 <- relevel(via_enroll$exam_result2, ref = 1)
 model_result_unadj <- glm(exam_result2 ~ factor(hivflag) , data = via_enroll, 
@@ -151,18 +154,18 @@ unadj_orCI <- tidy(model_result_unadj, conf.int = T, conf.level = 0.95, exponent
 View(unadj_orCI)
 
 
-via_enroll$hivflag <- relevel(as.factor(via_enroll$hivflag), ref = 2)
-model_result <- glm(exam_result3 ~ as.factor(hivflag) + age + sxptlife ,
+via_enroll$hiv <- relevel(as.factor(via_enroll$hiv), ref = "HIV-Negative")
+model_result <- glm(exam_result2 ~ as.factor(hiv) + age + sxptlife + country,
                     data = via_enroll, family = 'binomial')
 orCI <- cbind(tidy(model_result, conf.int = F, conf.level = 0.95, exponentiate = T), 
               exp(confint_tidy(model_result, conf.level = 0.95, func = stats::confint.default)))
 orCI <- orCI %>% mutate_if(is.numeric, round, 2)
-View(orCI)
+
 
 orCI$ci <- paste(round(orCI$conf.low, 2), round(orCI$conf.high, 2), sep = "-")
 tab3 <- cbind(orCI$term, orCI$estimate, orCI$ci, orCI$p.value)
-
 colnames(tab3) <- c("Variable", 'aOR', '95% CI', 'P-value')
+
 write.csv(tab3, file="table2_any_abnormality.csv")
 
 
@@ -181,10 +184,11 @@ colnames(tab3) <- c("Outcome", "Variable", 'aOR', '95% CI', 'P-value')
 write.csv(tab3, file="table2_multinom.csv")
 
 
-### cervical exam outcomes among HIV-positive only ### 
+### cervical exam outcomes among HIV-positive women only ### 
 hiv_pos$cd4nadir_cat <- relevel(hiv_pos$cd4nadir_cat, ref = ">=500")
-model_hiv <- glm(exam_result3 ~ hiv + age + para + timeToClinic_min +
-                 dur_hiv + cd4nadir_cat, data = hiv_pos, family = 'binomial')
+hiv_pos$hiv <- relevel(as.factor(hiv_pos$hiv), ref = "HIV-Positive, not on ART")
+model_hiv <- glm(exam_result2 ~ as.factor(hiv) + age + para + timeToClinic_min +
+                 dur_hiv + cd4nadir_cat + country, data = hiv_pos, family = 'binomial')
 orCI_hiv <- cbind(tidy(model_hiv, conf.int = F, conf.level = 0.95, exponentiate = T), 
               exp(confint_tidy(model_hiv, conf.level = 0.95, func = stats::confint.default)))
 orCI_hiv <- orCI_hiv %>% mutate_if(is.numeric, round, 2)
@@ -194,7 +198,7 @@ orCI_hiv$ci <- paste(round(orCI_hiv$conf.low, 2), round(orCI_hiv$conf.high, 2), 
 tab4 <- cbind(orCI_hiv$y.level, orCI_hiv$term, orCI_hiv$estimate, orCI_hiv$ci, orCI_hiv$p.value)
 
 colnames(tab4) <- c("Variable", 'aOR', '95% CI', 'P-value')
-write.csv(tab4, file="table3_any_abnormality.csv")
+write.csv(tab4, file="table3_acetowhite_lesion.csv")
 
 
 model_hiv <- multinom(exam_result ~ hiv + age + para + timeToClinic_min +
